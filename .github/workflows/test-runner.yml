@@ -1,0 +1,22 @@
+name: test-runner
+
+on:
+  workflow_dispatch:
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: hello-linux
+        run: |
+          echo "ubuntu runner OK"
+          uname -a
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - name: hello-macos
+        run: |
+          echo "macos runner OK"
+          sw_vers
+          xcodebuild -version
