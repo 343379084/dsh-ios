@@ -3,7 +3,6 @@ import WebKit
 import SwiftUI
 import UIKit
 import SafariServices
-import UniformTypeIdentifiers
 
 /// 持有 WKWebView 的唯一实例，负责：
 ///   · 首次用带 token 的 URL 换 cookie（dsh 0.1.5+ 根路径无 cookie 会 401）
@@ -298,17 +297,11 @@ extension WebController: WKNavigationDelegate {
 
 extension WebController: WKUIDelegate {
 
-    func webView(_ webView: WKWebView, runOpenPanelWith parameters: WKOpenPanelParameters,
-                 initiatedByFrame frame: WKFrameInfo,
-                 completionHandler: @escaping ([URL]?) -> Void) {
-        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [UTType.item], asCopy: true)
-        picker.allowsMultipleSelection = parameters.allowsMultipleSelection
-        picker.delegate = FilePickerProxy.shared
-        FilePickerProxy.shared.store(completionHandler)
-        DispatchQueue.main.async {
-            self.topViewController()?.present(picker, animated: true)
-        }
-    }
+    // 文件上传：<input type="file"> 在 WKWebView 里由 WebKit 内建处理
+    // （弹出 拍照 / 照片图库 / 选取文件），iOS 14+ 就可用，不需要 delegate。
+    // 曾经这里实现过 webView(_:runOpenPanelWith:...)，但 WKOpenPanelParameters
+    // 在 iOS 26 SDK 里被标成 iOS 18.4+，会让 deployment target 15.0 直接编译失败；
+    // 而它只是"更多文件类型可选"的增强，去掉不影响上传，所以不保留。
 
     func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String,
                  initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
@@ -387,24 +380,5 @@ extension WebController: WKScriptMessageHandler {
 }
 
 // MARK: - 文件选择代理
+// 已移除：文件上传交给 WebKit 内建选择器（见 WKUIDelegate 处的说明）。
 
-final class FilePickerProxy: NSObject, UIDocumentPickerDelegate {
-
-    static let shared = FilePickerProxy()
-
-    private var completion: (([URL]?) -> Void)?
-
-    func store(_ c: @escaping ([URL]?) -> Void) {
-        completion = c
-    }
-
-    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-        completion?(urls)
-        completion = nil
-    }
-
-    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
-        completion?(nil)
-        completion = nil
-    }
-}
