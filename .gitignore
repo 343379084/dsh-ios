@@ -1,0 +1,8 @@
+build/
+build.log
+Payload/
+*.ipa
+*.log
+__pycache__/
+DSHMobile.xcodeproj/
+.DS_Store

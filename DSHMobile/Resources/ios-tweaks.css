@@ -1,0 +1,126 @@
+/* ==========================================================================
+   iOS 兜底样式（在 mobile.css 之后追加，只补 iOS 上会出事的地方）
+   与 Android 版 mobile.css 不冲突：全部用更低侵入的写法，尽量少 !important。
+   ========================================================================== */
+
+/* 1) 文本自动放大：横竖屏切换 / 聚焦时 iOS 会把字号顶大，钉死 100% */
+html,
+body {
+  -webkit-text-size-adjust: 100% !important;
+  text-size-adjust: 100% !important;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: contain;
+}
+
+/* 2) ★ 防聚焦整页放大：iOS 里表单元素 font-size < 16px 时，聚焦会自动放大整个视口。
+      mobile.css 已覆盖 textarea / input[type=text|search] / div[class*="_input"]，
+      这里把剩下所有可能被 dsh 用到的表单控件补齐（含 select、contenteditable、日期类）。 */
+input,
+textarea,
+select,
+input[type="text"],
+input[type="search"],
+input[type="email"],
+input[type="url"],
+input[type="tel"],
+input[type="number"],
+input[type="password"],
+input[type="date"],
+input[type="datetime-local"],
+input[type="time"],
+select[class],
+[contenteditable="true"],
+[contenteditable=""] {
+  font-size: 16px !important;
+  line-height: 1.45 !important;
+}
+
+/* 3) 长按选择：dsh 的消息 / 代码块必须能选中复制。
+      iOS 默认对 App 内 WebView 的文本是 selectable 的，但一旦页面里出现
+      user-select:none 的父级，子元素就选不动，这里显式放开。 */
+pre,
+code,
+pre *,
+code *,
+[class*="_markdown"],
+[class*="_message"],
+[class*="_message"] *,
+[class*="_codeBlock"],
+[class*="_codeBlock"] * {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  -webkit-touch-callout: default !important;
+}
+
+/* 4) 滚动条：iOS 的 overlay scrollbar 又粗又挡字 */
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  background: transparent;
+}
+
+/* 5) 惯性滚动（会话流 / 侧栏 / 代码块） */
+[data-conversation-scroll],
+[class*="_scroll"],
+[class*="_list"],
+[class*="_thread"],
+[class*="_sidebar"],
+pre {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 6) 代码块横向滚动，不能被裁掉 */
+pre {
+  overflow-x: auto !important;
+  overflow-y: hidden;
+  max-width: 100%;
+}
+
+/* 7) 弹窗 / 设置面板：iOS 上必须留出安全区，并保证自身可滚动，
+      否则内容一多就顶到刘海或压住 Home Indicator */
+[role="dialog"],
+[class*="_modal"],
+[class*="_dialog"],
+[class*="_sheet"],
+[class*="_overlay"] > [class*="_panel"] {
+  max-height: calc(100vh - 28px) !important;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* 8) 底部安全区：输入座本身由 WebView 的 SafeArea 兜住，
+      这里只给浮层类元素补一点点，避免贴着 Home Indicator 显示 */
+[class*="_composerSeat"],
+[class*="_composerStack"] {
+  padding-bottom: max(0px, env(safe-area-inset-bottom, 0px) * 0.5) !important;
+}
+
+/* 9) 触控目标：iOS 手指比 Android 粗，最小 40px 命中区
+      （只作用于按钮类，不动输入座本身的布局） */
+button,
+[role="button"],
+[class*="_btn"],
+[class*="_button"] {
+  min-height: 36px;
+  touch-action: manipulation;
+}
+
+/* 10) 长 URL / 长 token 不撑破布局 */
+[class*="_message"] a,
+[class*="_markdown"] a {
+  word-break: break-all;
+}
+
+/* 11) 选中高亮用品牌蓝，视觉统一 */
+::selection {
+  background: rgba(77, 107, 254, 0.35);
+  color: inherit;
+}
+
+/* 12) 输入框光标颜色 */
+input,
+textarea,
+[contenteditable="true"] {
+  caret-color: #4d6bfe;
+}

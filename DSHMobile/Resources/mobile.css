@@ -1,0 +1,750 @@
+/* ============================================================
+   dsh-mobile 移动端适配样式（注入到 DeepSeek Harness Web UI）
+   目标：390px 左右手机竖屏，触控友好，无横向溢出。
+   基于 dsh 0.1.5 实际 DOM 结构编写：
+     框架  [class*="_frame"] = sidebarCol | centerCol | rightbarCol
+     导航  [class*="_rail"]（左侧图标栏）
+     侧栏  [data-slot="sidebar"] / [class*="_listArea"]
+     弹窗  [role="dialog"] / [class*="_dialog"]
+     输入  [class*="_composer"] / [class*="_input"]
+   类名带构建哈希前缀，故一律用 [class*=片段] 选择器。
+   ============================================================ */
+
+/* ---------- 基础 ---------- */
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: none;
+}
+
+body {
+  font-size: 15px;
+  line-height: 1.55;
+  touch-action: manipulation;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 溢出裁剪不能用 div[class*="_root"] 全局匹配（会波及所有组件根） */
+#root > div[class*="_root"],
+div[class*="_frame"],
+div[class*="_centerCol"] {
+  overflow-x: clip;
+}
+
+img, video, canvas {
+  max-width: 100vw;
+}
+
+/* 触控目标 */
+button,
+[role="button"],
+a,
+div[class*="_iconButton"],
+div[class*="_trigger"] {
+  min-height: 40px;
+  min-width: 40px;
+}
+
+/* ---------- 手机竖屏 ---------- */
+@media (max-width: 700px) {
+
+  /* 主内容列占满宽度。
+     grid auto-placement 会按 DOM 顺序塞轨道：sidebarCol 隐藏后
+     centerCol 会被塞进第一个 0px 轨道，必须显式钉回第 2 轨 */
+  div[class*="_centerCol"] {
+    width: 100%;
+    max-width: 100vw;
+    padding-left: 0;
+    padding-right: 0;
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+  }
+
+  /* 左侧 rail 不常驻：收起态整体隐藏（grid 的 auto 列随之塌成 0），
+     由 JS 注入的左上角悬浮按钮（#dsh-mobile-railbtn）呼出抽屉 */
+  body:not(.dsh-mobile-drawer) div[class*="_sidebarCol"] {
+    display: none !important;
+  }
+  /* 会话头部内容给左上角悬浮按钮让位。
+     注意：dsh 的头部容器是 <header> 标签，下面的 div 选择器打不中它；
+     真正的让位由 _titleRow 的 padding-left 完成（见下） */
+  div[class*="_centerCol"] div[class*="_header"] {
+    padding-left: 56px !important;
+  }
+  /* 上面那条会误中 _headerActions/_headerUtilities（class 同样含
+     "_header" 子串），各塞进 56px 无效左 padding——实测这会把
+     Standard mode 标签和后台任务胶囊整体右推 56px，胶囊被挤到
+     最小宽度后溢出盖住 Session log 按钮。显式清零收回这 112px */
+  div[class*="_centerCol"] div[class*="_headerActions"],
+  div[class*="_centerCol"] div[class*="_headerUtilities"] {
+    padding-left: 0 !important;
+  }
+  /* 标题行空间分配：dsh 桌面布局里 _headerActions 是 flex:0 0 auto
+     （不可收缩），有后台任务时胶囊（"N background job running" ~180px）
+     把 _titleCluster 撑爆，溢出部分直接压住右侧 _headerUtilities 里的
+     Session log 按钮。改为：actions 可收缩、胶囊内计数文字省略号，
+     右侧 utilities（Session log min-width:111px）钉死不缩 */
+  div[class*="_centerCol"] div[class*="_titleRow"] {
+    flex-wrap: nowrap !important;
+    /* 悬浮汉堡按钮 #dsh-mobile-railbtn 占左上加 [6..46]，
+       _header 自身 padding-left:20px 不够，标题 crumb 会从 x=20 起
+       压到按钮上；补 36px 让 crumb 从 x=56 开始 */
+    padding-left: 36px !important;
+  }
+  div[class*="_centerCol"] div[class*="_titleCluster"],
+  div[class*="_centerCol"] div[class*="_headerActions"] {
+    min-width: 0 !important;
+  }
+  div[class*="_centerCol"] div[class*="_headerActions"] {
+    flex: 0 1 auto !important;
+    flex-wrap: nowrap !important;
+    /* 不要 overflow:hidden——胶囊的下拉菜单（_menu）绝对定位在内部，
+       会被裁掉 */
+  }
+  /* 模式标签（Standard/Creator mode）可收缩+省略号：保持原宽（flex:0 0 auto）
+     时标签（~93px）会溢出自身盒子压住右侧 Session log 按钮（实测重叠 24px）。
+     注意胶囊的下拉菜单也在 _headerActions 内（_root 里），这里的
+     > div > span 只命中直挂的模式标签，不要波及菜单行里的 _label
+     （菜单行 label 靠 dsh 自己的 flex:1 + ellipsis 收缩） */
+  div[class*="_centerCol"] div[class*="_headerActions"] > div > span[class*="_label"] {
+    flex: 0 1 auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+  div[class*="_centerCol"] div[class*="_headerActions"] > div > div[class*="_root"] {
+    flex: 0 1 auto !important;
+    min-width: 0 !important;
+  }
+  div[class*="_centerCol"] div[class*="_headerActions"] button[class*="_trigger"] {
+    max-width: 100%;
+    overflow: hidden;
+  }
+  div[class*="_centerCol"] div[class*="_headerActions"] button[class*="_trigger"] [class*="_count"] {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  div[class*="_centerCol"] div[class*="_headerUtilities"] {
+    flex: 0 0 auto !important;
+  }
+  /* 提问卡片（user-questions 的确认弹窗）：桌面 footer 是
+     「页码 | 错误提示 | 跳过+确认」一整行不换行，手机上内容超宽，
+     最右侧的确认键被挤出卡片（card overflow:hidden 直接裁掉）——
+     表现为"确认键点不到"。footer 允许折行、动作组独占一行，
+     两个按钮加大到 44px 触控目标 */
+  div[class*="_centerCol"] [class*="_footer"]:has([class*="_footerActions"]) {
+    flex-wrap: wrap !important;
+    row-gap: 8px;
+  }
+  div[class*="_centerCol"] [class*="_footerActions"] {
+    flex: 1 1 100% !important;
+    justify-content: flex-end !important;
+    gap: 8px !important;
+  }
+  div[class*="_centerCol"] [class*="_footerActions"] button {
+    flex: 1 1 0 !important;
+    min-height: 44px !important;
+    max-width: 50% !important;
+    white-space: nowrap;
+  }
+
+  /* 列宽拖拽手柄在触屏上没用，且会形成多余分隔线 */
+  div[class*="_handle"] {
+    display: none !important;
+  }
+  /* 导航栏展开的面板不要顶出屏幕 */
+  div[class*="_listArea"],
+  [data-slot="sidebar"] {
+    max-width: calc(100vw - 16px);
+  }
+
+  /* 右侧详情面板（右栏/轨迹/详情）：三态门控（JS 加类）。
+     有实质内容 → 全屏覆盖层；只有占位文案 → 整体隐藏，
+     否则它常驻 grid 列占掉大半宽度，消息流被挤成窄条。
+     dsh 0.1.5 把列从 _detailsCol 改名为 _rightbarCol，并给列元素加了稳定的
+     data-rightbar-col 属性（类名带构建哈希，属性更稳），两者都命中。 */
+  div[class*="_rightbarCol"].dsh-mobile-empty,
+  div[data-rightbar-col].dsh-mobile-empty {
+    display: none !important;
+  }
+  div[class*="_rightbarCol"].dsh-mobile-open,
+  div[data-rightbar-col].dsh-mobile-open {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 850;
+    width: 100vw !important;
+    max-width: 100vw !important;
+    min-width: 0 !important;
+    height: 100dvh !important;
+    overflow-y: auto;
+    background: var(--dsw-alias-bg-base, #ffffff);
+  }
+
+  /* ---------- 轨迹（Trajectory）事件详情面板 ----------
+     dsh 自带的窄屏规则（@media width<=760px）是 absolute right:0、宽 92%，
+     左缘留一截表格：表格里的步骤圆点（_requestBoundaryControl z-index:6）
+     比面板（z-index:5）高，直接画在面板内容上；而且 Summary 布局在矮面板下
+     概览 dl（Hierarchy/Status 行）被分节区挤塌成 16px，与分节标题重叠，
+     透出"Assistant Message"残影。手机上改为整宽覆盖 + 概览行不收缩 */
+  aside[class*="_details"] {
+    left: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    border-left: 0 !important;
+    z-index: 20 !important;
+  }
+  /* 列宽拖拽手柄在触屏上没用 */
+  aside[class*="_details"] [class*="_detailsResizeHandle"] {
+    display: none !important;
+  }
+  /* Summary 概览行保持完整高度（dsh 是 flex:0 1 auto + min-height:0，
+     分节区 min-content 很高时概览行被压塌；行特别多时内部滚动，
+     max-height 给分节区留空间） */
+  aside[class*="_details"] [class*="_detailBodySummary"] > [class*="_overview"] {
+    flex: 0 0 auto !important;
+    max-height: 45% !important;
+  }
+
+  /* 弹窗：不超出屏幕（Internal Testing Notice 默认溢出） */
+  div[role="dialog"],
+  div[class*="_dialog"] {
+    max-width: calc(100vw - 24px) !important;
+    width: auto !important;
+    min-width: 0 !important;
+    margin-left: 12px !important;
+    margin-right: 12px !important;
+    box-sizing: border-box;
+    max-height: 88dvh;
+    overflow-y: auto;
+  }
+  div[class*="_overlayLayer"] {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  /* 弹窗按钮不换行挤压，行内放不下时整体换行。
+     注意不能给全部按钮 flex:1——头部行（"打开配置文件" + 关闭×）会被拉成
+     两个等宽块，× 悬浮在行中间。关闭/图标按钮保持自适应宽度并顶到右侧 */
+  div[role="dialog"] button {
+    white-space: nowrap;
+  }
+  div[role="dialog"] div[class*="_header"] {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px;
+  }
+  div[role="dialog"] div[class*="_header"] button[class*="_close"],
+  div[role="dialog"] div[class*="_header"] [class*="_iconButton"] {
+    flex: 0 0 auto !important;
+    margin-left: auto !important;
+  }
+  /* 头部动作区（"打开配置文件"等）占满剩余宽度但内容左对齐 */
+  div[role="dialog"] div[class*="_header"] div[class*="_actions"] {
+    flex: 1 1 auto !important;
+    justify-content: flex-start !important;
+  }
+
+  /* 插件页注入的「添加插件」行（inject.js ensurePluginAdder） */
+  #dsh-mobile-plugin-adder {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 0;
+    border-top: 1px solid var(--dsw-alias-border-l2, #EBEDF0);
+  }
+  #dsh-mobile-plugin-adder input {
+    flex: 1 1 160px;
+    min-width: 0;
+    height: 36px;
+    font-size: 16px; /* 防聚焦缩放 */
+    padding: 0 12px;
+    box-sizing: border-box;
+    border: 1px solid var(--dsw-alias-border-l2, #EBEDF0);
+    border-radius: 8px;
+    background: var(--dsw-alias-bg-layer-3, #F7F8FA);
+    color: var(--dsw-alias-label-primary, #1F2329);
+  }
+  #dsh-mobile-plugin-adder button {
+    flex: 0 0 auto;
+    height: 36px;
+    padding: 0 16px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--dsw-alias-brand-primary, #4D6BFE);
+    color: #fff;
+    font-size: 13px;
+  }
+  #dsh-mobile-plugin-adder button:disabled {
+    opacity: 0.5;
+  }
+  #dsh-mobile-plugin-adder .dsh-mobile-plugin-adder-status {
+    flex: 1 1 100%;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--dsw-alias-label-secondary, #8F959E);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  /* 输入卡片底行（_tools + _trailing）窄屏折行后，trailing（模型选择器+发送键）
+     独占一行时仍保持 flex:0 0 auto 左对齐——模型和发送键挤在左半边、右缘空一截。
+     占满整行并两端对齐：模型在左、发送键贴卡片右缘 */
+  div[class*="_card"] > div[class*="_row"] > div[class*="_trailing"] {
+    flex: 1 1 100% !important;
+    justify-content: space-between !important;
+  }
+
+  /* Hero 区与输入框 */
+  div[class*="_hero"] {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+  /* dsh 选择器组件（模型/模式选择）根节点带 min-height:100dvh（桌面弹层用），
+     泄漏到输入框内联触发器上会把整张输入卡片撑到全屏高 */
+  html body div[class*="_trailing"] div[class*="_root"],
+  html body div[class*="_modes"] div[class*="_root"],
+  html body div[class*="_row"] div[class*="_trigger"][class*="_root"] {
+    min-height: 0 !important;
+    height: auto !important;
+  }
+
+  /* ---------- 会话消息页：锁死高度链 ----------
+     打开有消息的会话时，消息流把 grid 行高撑成内容高（5000px+），
+     整页被 frame 裁掉只剩顶部一屏，输入框沉底不可达——"看不到对话消息"。
+     只约束 grid 行 = 视口高；往下 dsh 自己的 flex 链（fg=1 + min-height:0
+     + overflow:auto）会自然 bounded，不要再给内部组件强加高度
+     （会干扰消息流的虚拟化测量，把每条消息拉成一屏高）。 */
+  div[class*="_frame"] {
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    grid-template-rows: 100% !important;
+    /* 轨道是定值：侧栏/详情列 display:none 后轨道不塌，
+       auto-placement 会把 centerCol 塞进第一个 56px 轨道。
+       手机上三列全部归一为「只有中列」，侧栏/详情需要时都是 fixed 覆盖层 */
+    grid-template-columns: 0 minmax(0, 1fr) 0 !important;
+  }
+  div[class*="_centerCol"] {
+    max-height: 100dvh !important;
+    min-height: 0 !important;
+  }
+  div[class*="_viewArea"] {
+    min-height: 0 !important;
+  }
+  div[class*="_headline"] {
+    font-size: clamp(28px, 8vw, 40px) !important;
+    line-height: 1.15 !important;
+  }
+  div[class*="_heroWorkspaceRow"],
+  div[class*="_row"] {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  div[class*="_composerStack"],
+  div[class*="_composer"],
+  div[class*="_card"] {
+    max-width: calc(100vw - 24px) !important;
+    box-sizing: border-box;
+  }
+  /* 限宽链（_composerSeat/_composerStack 被 cap 到 100vw-24）默认贴左，
+     右侧空 24px——整个新对话主区域看着"左偏移"。限宽后水平居中，
+     左右边距对称（卡片本身在 hero 列里已被 align-items:center 居中） */
+  div[class*="_composerSeat"],
+  div[class*="_composerStack"],
+  div[class*="_composer"] {
+    margin-left: auto !important;
+    margin-right: auto !important;
+  }
+  textarea,
+  input[type="text"],
+  input[type="search"],
+  div[class*="_input"] {
+    font-size: 16px !important; /* 防止聚焦时 WebView 自动放大 */
+  }
+
+  /* 会话区（_conversation/_chat 类名在 rc.6/rc.7 的 DOM 里并不存在——
+     issue #5 核对为无效规则，只保留 main 元素选择器） */
+  main {
+    width: 100% !important;
+    max-width: 100vw !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: 10px;
+    padding-right: 10px;
+    box-sizing: border-box;
+  }
+
+  /* 代码块/终端/表格横向滚动 */
+  pre,
+  code,
+  div[class*="_code"],
+  div[class*="_terminal"],
+  table {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    word-break: break-word;
+  }
+  pre code {
+    word-break: normal;
+    white-space: pre;
+  }
+
+  /* 下拉/菜单不超出屏幕（_popover 类名不存在——issue #5 核对为无效规则） */
+  div[class*="_menu"],
+  div[class*="_dropdown"] {
+    max-width: calc(100vw - 16px);
+  }
+
+  /* 工具条允许换行（_actions 除外：消息操作行被 dsh 固定 28px 高，
+     折行的耗时统计会溢出行外压住下一条消息的气泡——见下方专门规则） */
+  div[class*="_toolbar"],
+  div[class*="_headerActions"] {
+    flex-wrap: wrap;
+  }
+
+  /* 消息操作行（复制/反馈图标 + 时间·耗时统计）：禁止折行，
+     统计文字（_timeEnd，无论是否被打标 .dsh-mobile-stats）收缩 + 横向滚动 */
+  div[class*="_flowItem"] div[class*="_actions"] {
+    flex-wrap: nowrap !important;
+  }
+  div[class*="_flowItem"] div[class*="_actions"] [class*="_timeEnd"],
+  div[class*="_flowItem"] div[class*="_actions"] .dsh-mobile-stats,
+  div[class*="_flowItem"] div[class*="_actions"] .dsh-mobile-stats div {
+    flex: 0 1 auto !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    flex-wrap: nowrap !important;
+    white-space: nowrap !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  div[class*="_flowItem"] div[class*="_actions"] [class*="_timeEnd"]::-webkit-scrollbar,
+  div[class*="_flowItem"] div[class*="_actions"] .dsh-mobile-stats::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* 底部安全区 + 输入区座实底：sticky 座默认透明，滚动时消息从
+     输入框下方/上方缝隙透出来，视觉上很"割裂" */
+  div[class*="_composerSeat"] {
+    background: var(--dsw-alias-bg-base, #ffffff) !important;
+    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -8px 16px -8px rgba(0, 0, 0, 0.08);
+  }
+  /* 会话页输入座钉死到可视视口底部：dsh 默认 sticky bottom:0（其锚点会被
+     滚动容器自身的 padding-bottom 上顶）或 overlay 态 absolute，两者都依赖
+     中间层高度链（100dvh/grid/flex）恰好成立；任一环节在真机上失效（旧
+     WebView 无 dvh、edge-to-edge 下 innerHeight 含导航栏、运行态 DOM 变化）
+     座就下沉出屏或浮到页面中部。fixed 与祖先高度/内边距完全解耦，
+     env(safe-area-inset-bottom) 由座自身的 padding-bottom 承担（见上条规则）。
+     hero（新对话）页的座在文档流里，保持 dsh 原行为不动 */
+  [data-composer-seat]:not(:has(div[class*="_composerHero"])),
+  div[class*="_centerCol"] div[class*="_composerSeat"]:not(:has(div[class*="_composerHero"])) {
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+  }
+  /* 新对话页整个 hero（标题+工作区+卡片）也在 _composerSeat 里：
+     座的上阴影会横在标题上方，像一截方块状阴影——hero 场景不要阴影 */
+  div[class*="_composerSeat"]:has(div[class*="_composerHero"]) {
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+  /* 消息流底部留白：不再写在滚动容器（_scrollBody）自己身上——滚动容器的
+     padding-bottom 会把 sticky 输入座的锚点同步上顶（padding 多大座就浮多
+     高），与"补偿重叠"的目的互相打架。留白改由 inject.js 往 scrollBody 末尾
+     追加的间隔块（#dsh-mobile-composer-spacer）承担，这里的 48px 只是
+     scroll-padding（scrollIntoView 用）的 JS 生效前兜底 */
+  div[class*="_centerCol"] [class*="_scrollBody"] {
+    scroll-padding-bottom: 48px;
+  }
+  /* scrollBody 是 flex 列，间隔块必须禁收缩，否则内容超高时被压成 0 */
+  #dsh-mobile-composer-spacer {
+    flex: 0 0 auto;
+  }
+  /* composer 汇总统计条（"N turns · N steps | LLM …"）在部分 dsh 版本里
+     不在 _composerSeat 内部，而是座下方文档流里的独立节点——座改 fixed 后
+     它会被座盖住/落在视口外。inject.js 给这种条加 .dsh-mobile-composer-stats
+     钉到视口最底，并把座的 bottom 上移条高，两者叠成完整的底部固定区 */
+  .dsh-mobile-composer-stats {
+    position: fixed !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    z-index: 6; /* 座是 7：重叠时座在上 */
+    width: 100%;
+    max-width: calc(100vw - 24px) !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    box-sizing: border-box;
+    padding: 4px 16px calc(4px + env(safe-area-inset-bottom, 0px)) !important;
+    background: var(--dsw-alias-bg-base, #ffffff);
+  }
+  div[class*="_composerStack"],
+  footer {
+    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* 消息流折叠卡片：行内 标题+来源 总宽超限时 flex 换行，
+     第二行被固定行高拦腰截断——禁止换行，来源收缩省略号 */
+  div[class*="_flowItem"] [class*="_row"] {
+    flex-wrap: nowrap !important;
+  }
+  div[class*="_flowItem"] [class*="_source"],
+  div[class*="_flowItem"] [class*="_title"] {
+    min-width: 0;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis;
+  }
+
+  /* token/耗时统计条（JS 按文本打标 .dsh-mobile-stats）：
+     段间允许换行（每段内部不换行），字号收窄，不在屏幕右缘截断 */
+  .dsh-mobile-stats,
+  .dsh-mobile-stats div {
+    flex-wrap: wrap !important;
+    row-gap: 2px;
+    column-gap: 8px;
+    font-size: 11px !important;
+    line-height: 1.4 !important;
+    max-width: 100% !important;
+    overflow: visible !important;
+    box-sizing: border-box;
+    padding-right: 4px;
+    white-space: normal !important;
+  }
+  .dsh-mobile-stats span {
+    white-space: nowrap !important;
+    display: inline-block;
+  }
+  /* 折行后行尾会吊着孤立的 "|" 分隔符（JS 打标 .dsh-mobile-stats-sep），隐藏 */
+  .dsh-mobile-stats .dsh-mobile-stats-sep {
+    display: none !important;
+  }
+  .dsh-mobile-stats {
+    justify-content: flex-start !important;
+    text-align: left !important;
+  }
+
+  /* ---------- 抽屉头部图标：桌面悬停布局泄漏 ----------
+     _headerActions 宽 60px 装两个 40px 图标被迫换行成 84px 高，垂直居中后
+     上下各溢出 24px，被 _sectionHeader 的 overflow:hidden 裁成半截；
+     搜索按钮 40px 也被 28px 槽位裁切。手机上一律单行展开、不裁切。 */
+  div[class*="_sidebarCol"] div[class*="_sectionHeader"] {
+    overflow: visible !important;
+    align-items: center !important;
+    height: auto !important;
+    min-height: 44px !important;
+  }
+  div[class*="_sidebarCol"] div[class*="_headerActions"] {
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    flex-wrap: nowrap !important;
+    overflow: visible !important;
+    align-self: center !important;
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+  }
+  div[class*="_sidebarCol"] div[class*="_searchSlot"],
+  div[class*="_sidebarCol"] div[class*="_search"] {
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    align-self: center !important;
+  }
+
+  /* ---------- 设置弹窗：单列化 ----------
+     桌面结构：_panel(横向flex) = 左_nav(188px) + 右_content。
+     390px 下右侧只剩约 150px，文案逐词换行且 _options 层盖住导航按钮。
+     改为：导航变顶部横向滚动标签条，内容占满全宽。 */
+  div[class*="_panel"]:has(> nav[class*="_nav"]) {
+    flex-direction: column !important;
+  }
+  div[class*="_panel"] > nav[class*="_nav"] {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    flex: 0 0 auto !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch;
+    border-right: 0 !important;
+    box-sizing: border-box;
+  }
+  div[class*="_panel"] > nav[class*="_nav"] [class*="_navList"],
+  div[class*="_panel"] > nav[class*="_nav"] ul,
+  div[class*="_panel"] > nav[class*="_nav"] ol {
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    width: max-content !important;
+    min-width: 0 !important;
+  }
+  /* 标题（"设置"）不被横向标签条挤压——否则两字标题会竖向折行 */
+  div[class*="_panel"] > nav[class*="_nav"] [class*="_navTitle"] {
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
+  }
+  div[class*="_panel"] > nav[class*="_nav"] [class*="_navCell"] {
+    flex: 0 0 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+    white-space: nowrap !important;
+  }
+  div[class*="_panel"] > div[class*="_content"] {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    flex: 1 1 auto !important;
+    box-sizing: border-box;
+  }
+  div[class*="_panel"] > div[class*="_content"] [class*="_options"],
+  div[class*="_panel"] > div[class*="_content"] [class*="_section"] {
+    max-width: 100% !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box;
+    overflow-x: hidden;
+  }
+
+  /* 会话/工作区行的 ⋯ 动作按钮：桌面只在 hover 时显示（display:none），
+     触屏没有 hover——点按 ⋯ 位置命中的是行本身，直接进了对话（issue #3）。
+     手机上常显；时间标签让位（行宽不够） */
+  div[class*="_sidebarCol"] [class*="_sessionRow"] [class*="_rowActions"],
+  div[class*="_sidebarCol"] [class*="_projectRow"] [class*="_rowActions"] {
+    display: inline-flex !important;
+    gap: 4px !important;
+  }
+  div[class*="_sidebarCol"] [class*="_sessionRow"] [class*="_time"] {
+    display: none !important;
+  }
+
+  /* ---------- 侧栏抽屉化 ----------
+     会话页展开侧栏时（桌面行为是把 centerCol 挤到只剩 110px），
+     JS 检测到 sidebarCol 宽度 >100px 会给 body 加 .dsh-mobile-drawer：
+     侧栏变覆盖式抽屉，遮罩点击收起，会话区保持全宽。 */
+  #dsh-mobile-drawer-mask {
+    display: none;
+  }
+  body.dsh-mobile-drawer #dsh-mobile-drawer-mask {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 908;
+    background: rgba(0, 0, 0, 0.45);
+  }
+  body.dsh-mobile-drawer div[class*="_frame"] {
+    display: block !important;
+  }
+  body.dsh-mobile-drawer div[class*="_sidebarCol"] {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    width: min(320px, 85vw) !important;
+    max-width: 85vw !important;
+    height: 100dvh !important;
+    z-index: 909;
+    background: var(--dsw-alias-bg-base, #ffffff);
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.25);
+    overflow-y: auto;
+    /* overflow-y 非 visible 时 overflow-x 会跟着变成 auto——内部内容比抽屉宽时
+       右缘图标（添加工作区等）被无声裁掉；改为 hidden 并约束内部宽度 */
+    overflow-x: hidden !important;
+    /* 抽屉开合过渡（时长与 inject.js 的 DRAWER_ANIM_MS 一致）。收起由
+       closeSidebar 先滑出、动画结束才收起 dsh 侧栏本身，否则侧栏内容会在仍
+       看得见的面板里重排成图标栏，收起动画看起来是碎的 */
+    transition: transform 200ms ease-out !important;
+  }
+  body.dsh-mobile-drawer.dsh-mobile-drawer-preopen div[class*="_sidebarCol"],
+  body.dsh-mobile-drawer.dsh-mobile-drawer-closing div[class*="_sidebarCol"] {
+    transform: translateX(-100%) !important;
+  }
+  body.dsh-mobile-drawer #dsh-mobile-drawer-mask {
+    transition: opacity 200ms ease-out;
+  }
+  body.dsh-mobile-drawer.dsh-mobile-drawer-preopen #dsh-mobile-drawer-mask,
+  body.dsh-mobile-drawer.dsh-mobile-drawer-closing #dsh-mobile-drawer-mask {
+    opacity: 0;
+  }
+  body.dsh-mobile-drawer div[class*="_sidebarCol"] > *,
+  body.dsh-mobile-drawer div[class*="_sidebarCol"] div[class*="_listArea"],
+  body.dsh-mobile-drawer div[class*="_sidebarCol"] [data-slot="sidebar"],
+  body.dsh-mobile-drawer div[class*="_sidebarCol"] div[class*="_sectionHeader"],
+  body.dsh-mobile-drawer div[class*="_sidebarCol"] div[class*="_sessionRow"] {
+    max-width: 100% !important;
+    box-sizing: border-box;
+  }
+  body.dsh-mobile-drawer div[class*="_sidebarCol"] div[class*="_sectionHeader"] [class*="_headerActions"] {
+    flex: 0 1 auto !important;
+    min-width: 0 !important;
+  }
+  body.dsh-mobile-drawer div[class*="_centerCol"] {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    margin-left: 0 !important;
+  }
+  body.dsh-mobile-drawer div[class*="_handle"] {
+    display: none !important;
+  }
+}
+
+/* ---------- 高度：动态视口，避免地址栏抖动 ----------
+   只钉应用真正的根节点（React 挂载点 #root 的直接子级）。
+   绝不能写成 div[class*="_root"] 全局匹配——dsh 所有组件根类名都含
+   "_root" 片段，会被强加 min-height:100dvh，消息卡片/选择器全被拉成一屏高。 */
+div[class*="_boot"],
+#root > div[class*="_root"],
+div[class*="_frame"] {
+  min-height: 100dvh;
+}
+
+/* ---------- 左上角侧栏呼出按钮（JS 注入，仅在手机且抽屉关闭时显示） ---------- */
+/* 幽灵样式：透明底、无边框无阴影——白色方块压在顶栏上会像"重叠的方块背景" */
+#dsh-mobile-railbtn {
+  display: none;
+  position: fixed;
+  top: max(10px, env(safe-area-inset-top, 0px));
+  left: 6px;
+  z-index: 800;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: none;
+  background: transparent;
+  color: var(--dsw-alias-text-primary, #1a1a1a);
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+#dsh-mobile-railbtn:active {
+  background: rgba(0, 0, 0, 0.06);
+}
+#dsh-mobile-railbtn svg {
+  width: 20px;
+  height: 20px;
+}
+@media (max-width: 700px) {
+  body:not(.dsh-mobile-drawer) #dsh-mobile-railbtn {
+    display: flex;
+  }
+}
