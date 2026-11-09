@@ -234,11 +234,55 @@ chmod +x build-ipa.sh
 3. AppIcon 存在
 4. `xcodegen generate`
 5. `xcodebuild`（`CODE_SIGNING_ALLOWED=NO`）
-6. 打完包后**回查**：`mobile.css / inject.js / early-polyfill.js / ios-tweaks.css` 是否真的进了 `.app` 根目录
+6. 打完包后**回查**：`mobile.css / inject.js / early-polyfill.js / ios-tweaks.css` 是否真的进了 `.app` 根目录（没进就自动补入）
 7. `file` + `lipo -info` 确认二进制是 arm64
 8. 失败时把 `build.log` 一起传上来
 
 任何一步不过直接 fail，不会给出一个装不上的空壳 IPA。
+
+### 实际跑通时踩掉的两个坑（记在这，别再踩）
+
+**① `concurrency` 块会让 run 在排队阶段就被 `cancelled`**
+
+最初写了：
+
+```yaml
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+```
+
+结果是 run 创建后 **2 秒内 `cancelled`、`runner` 字段为空、日志压缩包 22 字节（空的）**，
+`push` 和 `workflow_dispatch` 都复现。删掉这个块、只保留 `runs-on` 后立刻正常。
+
+> 排查方法：另建一个最小 workflow 各跑 `ubuntu-latest` / `macos-latest` 一个 job。
+> 两个都成功 → 说明账号、额度、runner 都没问题，问题在被测 workflow 自己身上。
+> 现成的诊断文件是 `.github/workflows/test-runner.yml`。
+
+**② `runOpenPanelWith` 的 `WKOpenPanelParameters` 是 iOS 18.4+**
+
+Xcode 26.6 / iOS SDK 26.5 下编译直接报：
+
+```
+error: 'WKOpenPanelParameters' is only available in iOS 18.4 or newer
+```
+
+deployment target 15.0 就过不去。而这个 delegate 只是"可选更多文件类型"的增强 ——
+`<input type="file">` 在 iOS 14+ 由 **WebKit 内建**处理（拍照 / 照片图库 / 选取文件），
+所以直接删掉这个方法最省事，文件上传照样能用。
+
+---
+
+## 附：产物自检
+
+`verify_ipa.py` 可以不依赖 macOS 校验 IPA 是否可签：
+
+```bash
+python verify_ipa.py 成品/DSHMobile-unsigned.ipa
+```
+
+检查 zip 顶层是否只有 `Payload/`、Mach-O 是否 arm64、四份资源是否在 `.app` 根目录、
+ATS 是否放行 http、是否残留 `_CodeSignature`。
 
 ---
 

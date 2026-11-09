@@ -1,3 +1,5 @@
+# runner 可用性诊断：build-ipa 若在排队阶段就被 cancelled、runner 为空，
+# 先手动跑这个，确认 ubuntu/macos 两种 runner 在本仓库是否可用。
 name: test-runner
 
 on:
